@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models.user import User as UserModel
-from app.schemas.user import User, SignupRequest, LoginRequest
+from app.schemas.user import User, SignupRequest, LoginRequest, UpdateUserRequest
 import logging
 import bcrypt
 import os
@@ -114,5 +114,29 @@ def login_user(request: LoginRequest, db: Session) -> dict:
         "message": "Login successful",
         "access_token": access_token,
         "token_type": "bearer",
-        "user_id": user.id
+        "user_id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "is_active": user.is_active,
     }
+
+
+def update_user(user_id: int, request: UpdateUserRequest, db: Session) -> UserModel:
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if request.username:
+        # Check if new username already exists
+        if db.query(UserModel).filter(UserModel.username == request.username).first():
+            raise HTTPException(status_code=400, detail="Username already taken")
+        user.username = request.username
+
+    if request.phone_number:
+        user.phone_number = request.phone_number
+
+    db.commit()
+    db.refresh(user)
+
+    logger.info(f"User {user.username} updated successfully.")
+    return user
